@@ -78,13 +78,13 @@ parser.add_argument(
 
 
 def load_image(filename):
-  """Read in the image_data to be classified."""
-  return tf.gfile.FastGFile(filename, 'rb').read()
+    """Read in the image_data to be classified."""
+    return tf.gfile.FastGFile(filename, 'rb').read()
 
 
 def load_labels(filename):
-  """Read in labels, one label per line."""
-  return [line.rstrip() for line in tf.gfile.GFile(filename)]
+    """Read in labels, one label per line."""
+    return [line.rstrip() for line in tf.gfile.GFile(filename)]
 
 
 def load_graph(filename):

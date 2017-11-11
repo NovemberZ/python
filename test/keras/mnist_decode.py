@@ -1,6 +1,7 @@
 from PIL import Image
 import struct
 
+
 def read_image(from_filename, to_path):
   f = open(from_filename, 'rb')
 
@@ -9,7 +10,7 @@ def read_image(from_filename, to_path):
 
   f.close()
 
-  magic, images, rows, columns = struct.unpack_from('>IIII' , buf , index)
+  magic, images, rows, columns = struct.unpack_from('>IIII', buf, index)
   index += struct.calcsize('>IIII')
 
   for i in range(images):
@@ -21,6 +22,7 @@ def read_image(from_filename, to_path):
     print('save ' + str(i) + 'image')
     image.save(to_path + '/' + str(i) + '.png')
 
+
 def read_label(from_filename, to_filename):
   f = open(from_filename, 'rb')
   index = 0
@@ -28,9 +30,9 @@ def read_label(from_filename, to_filename):
 
   f.close()
 
-  magic, labels = struct.unpack_from('>II' , buf , index)
+  magic, labels = struct.unpack_from('>II', buf, index)
   index += struct.calcsize('>II')
-  
+
   labelArr = [0] * labels
   #labelArr = [0] * 2000
 
@@ -55,7 +57,7 @@ def read_image_to_list(from_filename):
 
   f.close()
 
-  magic, images, rows, columns = struct.unpack_from('>IIII' , buf , index)
+  magic, images, rows, columns = struct.unpack_from('>IIII', buf, index)
   index += struct.calcsize('>IIII')
 
   imgs_list = []
@@ -82,9 +84,9 @@ def read_label_to_list(from_filename):
 
   f.close()
 
-  magic, labels = struct.unpack_from('>II' , buf , index)
+  magic, labels = struct.unpack_from('>II', buf, index)
   index += struct.calcsize('>II')
-  
+
   label_list = []
   for x in range(labels):
     label_list.append(int(struct.unpack_from('>B', buf, index)[0]))
@@ -102,6 +104,7 @@ def load_data():
   y_test = read_label_to_list('../data/mnist/t10k-labels-idx1-ubyte')
 
   return (x_train, y_train), (x_test, y_test)
+
 
 if __name__ == '__main__':
   # read_image('../data/mnist/train-images-idx3-ubyte', '../data/mnist/train')

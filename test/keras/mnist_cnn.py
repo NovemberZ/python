@@ -1,5 +1,4 @@
 import keras
-from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
@@ -10,7 +9,7 @@ import mnist_decode
 
 batch_size = 128
 num_classes = 10
-epochs = 12
+epochs = 2  # 12
 
 # input image dimensions
 img_rows, img_cols = 28, 28
@@ -18,7 +17,8 @@ img_rows, img_cols = 28, 28
 # the data, shuffled and split between train and test sets
 (x_train, y_train), (x_test, y_test) = mnist_decode.load_data()
 
-(x_train, y_train), (x_test, y_test) = (np.array(x_train), np.array(y_train)), (np.array(x_test), np.array(y_test))
+(x_train, y_train) = (np.array(x_train), np.array(y_train))
+(x_test, y_test) = (np.array(x_test), np.array(y_test))
 
 if backend.image_data_format() == 'channels_first':
     x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)

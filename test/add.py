@@ -1,4 +1,4 @@
-#coding=UTF-8
+# coding=UTF-8
 print(100 / 3.0)
 print(True)
 print(1 > 2)
@@ -7,7 +7,6 @@ a = 123
 print(a)
 a = 'ABC'
 print(a)
-
 print('包含中文的str')
 
 classmates = ['Michael', 'Bob', 'Tracy']
@@ -50,4 +49,4 @@ print(d['Michael'])
 s = set([1, 1, 2, 2, 3, 3])
 print(s)
 
-print(1!=2)
+print(1 != 2)
