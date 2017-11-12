@@ -2,6 +2,7 @@
 
 import yaml
 import sys
+import os
 
 from sklearn.model_selection import train_test_split
 import multiprocessing
@@ -17,7 +18,6 @@ from keras.layers.core import Dense, Dropout, Activation
 from keras.models import model_from_yaml
 
 import jieba
-import pandas as pd
 
 np.random.seed(1337)  # For Reproducibility
 sys.setrecursionlimit(1000000)
@@ -38,10 +38,21 @@ input_length = 100
 
 # 加载训练文件
 def load_data():
-    neg = pd.read_excel('../data/sentiment_lstm/neg.xls', header=None, index=None)
-    pos = pd.read_excel('../data/sentiment_lstm/pos.xls', header=None, index=None)
+    base_path = '../data/sentiment_lstm/'
 
-    data = np.concatenate((pos[0], neg[0]))
+    pos = []
+    f = open(os.path.join(base_path, 'pos.txt'))
+    for line in f:
+        pos.append(line)
+    f.close()
+    print(len(pos))
+    neg = []
+    f = open(os.path.join(base_path, 'neg.txt'))
+    for line in f:
+        neg.append(line)
+    f.close()
+
+    data = np.concatenate((np.array(pos), np.array(neg)))
     y = np.concatenate((np.ones(len(pos), dtype=int), np.zeros(len(neg), dtype=int)))
 
     return data, y
@@ -80,7 +91,7 @@ def create_dict(model=None, data=None):
                     sentence_idx.append(word_idx[word])
                 except Exception as e:
                     sentence_idx.append(0)
-                sentences_idx.append(sentence_idx)
+            sentences_idx.append(sentence_idx)
 
         # 每个句子所含词语对应的索引，所以句子中含有频数小于10的词语，索引为0
         sentences_idx = sequence.pad_sequences(sentences_idx, maxlen=maxlen)
@@ -101,7 +112,7 @@ def train_word2vec(sentences):
     model.train(sentences, total_examples=model.corpus_count, epochs=model.iter)
 
     model.save('../model/Word2vec_model.pkl')
-    word_idx, word_vec, sentences_idx = create_dict(model=model, combined=sentences)
+    word_idx, word_vec, sentences_idx = create_dict(model=model, data=sentences)
     return word_idx, word_vec, sentences_idx
 
 
@@ -125,7 +136,7 @@ def train_lstm(n_symbols, embedding_weights, x_train, y_train, x_test, y_test):
                         mask_zero=True,
                         weights=[embedding_weights],
                         input_length=input_length))  # Adding Input Length
-    model.add(LSTM(output_dim=50, activation='sigmoid', inner_activation='hard_sigmoid'))
+    model.add(LSTM(units=50, activation='sigmoid', recurrent_activation='hard_sigmoid'))
     model.add(Dropout(0.5))
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
@@ -198,7 +209,7 @@ def lstm_predict(txt):
 
 if __name__ == '__main__':
 
-    if(0):
+    if(1):
         train()
 
     pred_data = ['电池充完了电连手机都打不开.简直烂的要命.真是金玉其外,败絮其中!连5号电池都不如',
