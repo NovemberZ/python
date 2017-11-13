@@ -24,16 +24,14 @@ sys.setrecursionlimit(1000000)
 # set parameters:
 cpu_count = multiprocessing.cpu_count()
 
-word2vec_size = 100
+word2vec_size = 100  # 神经网络单元的个数
 word2vec_iter = 1  # ideally more..
-word2vec_min_count = 10
-word2vec_window = 7
-
-maxlen = 100
+word2vec_min_count = 10  # 统计数小余10的话，忽略
+word2vec_window = 7  # 窗口为7：前3后3
 
 batch_size = 32
-n_epoch = 4
-input_length = 100
+epochs = 4
+input_length = 50  # 每个句子input_length个单词
 
 
 # 加载训练文件
@@ -41,25 +39,23 @@ def load_data():
     base_path = '../data/sentiment_lstm/'
 
     pos = []
-    f = open(os.path.join(base_path, 'pos.txt'))
-    for line in f:
-        pos.append(line)
-    f.close()
-    print(len(pos))
-    neg = []
-    f = open(os.path.join(base_path, 'neg.txt'))
-    for line in f:
-        neg.append(line)
-    f.close()
+    with open(os.path.join(base_path, 'pos.txt')) as f:
+        for line in f:
+            pos.append(line)
 
-    data = np.concatenate((np.array(pos), np.array(neg)))
+    neg = []
+    with open(os.path.join(base_path, 'neg.txt')) as f:
+        for line in f.readlines():
+            neg.append(line)
+
+    x = np.concatenate((np.array(pos), np.array(neg)))
     y = np.concatenate((np.ones(len(pos), dtype=int), np.zeros(len(neg), dtype=int)))
 
-    return data, y
+    return x, y
 
 
 # 对句子经行分词，并去掉换行符
-def cut_sentence(text):
+def cut_word(text):
     ''' Simple Parser converting each document to lower-case, then
         removing the breaks for new lines and finally splitting on the
         whitespace
@@ -94,7 +90,7 @@ def create_dict(model=None, data=None):
             sentences_idx.append(sentence_idx)
 
         # 每个句子所含词语对应的索引，所以句子中含有频数小于10的词语，索引为0
-        sentences_idx = sequence.pad_sequences(sentences_idx, maxlen=maxlen)
+        sentences_idx = sequence.pad_sequences(sentences_idx, maxlen=input_length)
         return word_idx, word_vec, sentences_idx
     else:
         print('No data provided...')
@@ -119,10 +115,12 @@ def train_word2vec(sentences):
 def preprocess_lstm(word_idx, word_vec, sentences_idx, y):
     n_symbols = len(word_idx) + 1  # 所有单词的索引数，频数小于10的词语索引为0，也作为一个单词，所以加1
     embedding_weights = np.zeros((n_symbols, word2vec_size))  # 索引为0的词语，词向量全为0
+    print('embedding_weights shape:', embedding_weights.shape)
+
     for word, index in word_idx.items():  # 从索引为1的词语开始，对每个词语对应其词向量
         embedding_weights[index, :] = word_vec[word]
+
     x_train, x_test, y_train, y_test = train_test_split(sentences_idx, y, test_size=0.2)
-    print(x_train.shape, y_train.shape)
     return n_symbols, embedding_weights, x_train, y_train, x_test, y_test
 
 
@@ -130,22 +128,33 @@ def preprocess_lstm(word_idx, word_vec, sentences_idx, y):
 def train_lstm(n_symbols, embedding_weights, x_train, y_train, x_test, y_test):
     print('Defining a Simple Keras Model...')
 
+    print('x_train shape:', x_train.shape)
+    print('y_train shape:', y_train.shape)
     model = Sequential()  # or Graph or whatever
+    # Embedding Param Count: 8308[单词数+1] * 100[维度]
     model.add(Embedding(output_dim=word2vec_size,
                         input_dim=n_symbols,
                         mask_zero=True,
                         weights=[embedding_weights],
                         input_length=input_length))  # Adding Input Length
+    '''
+    cell 的权重是共享的，那么一层的 LSTM 的参数有多少个？假设 num_units 是128，输入是28位的，那么根据上面的第二点，
+    可以得到，四个小黄框的参数一共有 （128+28）*（128*4），也就是156 * 512，可以看看 TensorFlow 的最简单的 LSTM 的案例，
+    中间层的参数就是这样，不过还要加上输出的时候的激活函数的参数，假设是10个类的话，就是128*10的 W 参数和10个bias 参数
+    '''
+    # LSTM Param Count: (100[词向量个数] + 1[bias] + 50[反馈]) * 50[隐藏层个数] * 4[4个网络] = 30200
     model.add(LSTM(units=50, activation='sigmoid', recurrent_activation='hard_sigmoid'))
     model.add(Dropout(0.5))
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
 
+    model.summary()
+
     print('Compiling the Model...')
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
     print("Training the Model...")
-    model.fit(x_train, y_train, batch_size=batch_size, epochs=n_epoch, verbose=1,
+    model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, verbose=1,
               validation_data=(x_test, y_test))
 
     print("Evaluate the Model...")
@@ -158,36 +167,16 @@ def train_lstm(n_symbols, embedding_weights, x_train, y_train, x_test, y_test):
     print('Test score:', score)
 
 
-# 训练模型，并保存
-def train():
-    print('Loading Data...')
-    data, y = load_data()
-    print("load_data:", len(data), len(y))
-
-    # sentences = [['first', 'sentence'], ['second', 'sentence']]
-    print('Tokenising...')
-    sentences = cut_sentence(data)
-    print("cut_sentence:", len(sentences))
-
-    print('Training a Word2vec model...')
-    word_idx, word_vec, sentences_idx = train_word2vec(sentences)
-
-    print('Setting up Arrays for Keras Embedding Layer...')
-    n_symbols, embedding_weights, x_train, y_train, x_test, y_test = preprocess_lstm(word_idx,
-                                                                                     word_vec, sentences_idx, y)
-    print(x_train.shape, y_train.shape)
-    train_lstm(n_symbols, embedding_weights, x_train, y_train, x_test, y_test)
-
-
 def input_transform(txt):
-    words = jieba.lcut(txt)
-    words = np.array(words).reshape(1, -1)
+    data = [txt]
+    sentences = cut_word(data)
+
     model = Word2Vec.load('../model/Word2vec_model.pkl')
-    _, _, sentences_idx = create_dict(model, words)
+    _, _, sentences_idx = create_dict(model, sentences)
     return sentences_idx
 
 
-def lstm_predict(txt):
+def predict_lstm(texts):
     print('loading model......')
     with open('../model/lstm.yml', 'r') as f:
         yaml_string = yaml.load(f)
@@ -197,14 +186,36 @@ def lstm_predict(txt):
     model.load_weights('../model/lstm.h5')
     model.compile(loss='binary_crossentropy',
                   optimizer='adam', metrics=['accuracy'])
-    data = input_transform(txt)
-    data.reshape(1, -1)
-    # print data
-    result = model.predict_classes(data)
-    if result[0][0] == 1:
-        print(txt, 1)
-    else:
-        print(txt, 0)
+    model.summary()
+
+    for txt in texts:
+        data = input_transform(txt)
+        # print data
+        result = model.predict_classes(data)
+        if result[0][0] == 1:
+            print(txt, 1)
+        else:
+            print(txt, 0)
+
+
+# 训练模型，并保存
+def train():
+    print('Loading Data...')
+    x, y = load_data()
+    print("load_data:", len(x), len(y))
+
+    # sentences = [['first', 'sentence'], ['second', 'sentence']]
+    print('Tokenising...')
+    sentences = cut_word(x)
+    print("cut_word:", len(sentences))
+
+    print('Training a Word2vec model...')
+    word_idx, word_vec, sentences_idx = train_word2vec(sentences)
+
+    print('Setting up Arrays for Keras Embedding Layer...')
+    n_symbols, embedding_weights, x_train, y_train, x_test, y_test = preprocess_lstm(word_idx,
+                                                                                     word_vec, sentences_idx, y)
+    train_lstm(n_symbols, embedding_weights, x_train, y_train, x_test, y_test)
 
 
 if __name__ == '__main__':
@@ -222,5 +233,4 @@ if __name__ == '__main__':
                  '质量不错，是正品 ，安装师傅也很好，才要了83元材料费',
                  '东西非常不错，安装师傅很负责人，装的也很漂亮，精致，谢谢安装师傅！']
 
-    for txt in pred_data:
-        lstm_predict(txt)
+    predict_lstm(pred_data)
